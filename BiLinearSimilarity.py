@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import cmath
-from numpy.polynomial.polynomial import polydiv
 from sklearn.utils.extmath import randomized_svd
-from cvxopt import matrix, spmatrix, solvers
 
 #####################################################################
 #### LowRankBiLinear #####
