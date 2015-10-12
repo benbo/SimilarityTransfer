@@ -22,14 +22,14 @@ def Tfunc_fast(M,theta):
     A[M>0]=0
     return np.maximum(M-theta,0)+A
 
-
-def nearPSD(A,epsilon=0):
+#projection onto the PSD cone
+def nearPSD(A,epsilon=0.0):
    n = A.shape[0]
    if n==1: return(np.maximum(A,epsilon))
    eigval, eigvec = np.linalg.eig(A)
    val = np.matrix(np.maximum(eigval,epsilon))
    vec = np.matrix(eigvec)
-   T = 1/(np.multiply(vec,vec) * val.T)
+   T = 1.0/(np.multiply(vec,vec) * val.T)
    T = np.matrix(np.sqrt(np.diag(np.array(T).reshape((n)) )))
    B = T * vec * np.diag(np.array(np.sqrt(val)).reshape((n)))
    out = B*B.T
@@ -45,28 +45,37 @@ def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
     # alpha - regularization strength
     # tau - step size for the W updates
     # T - iteration limit
+    # epsilon parameter for the projection of a matrix onto the PSD cone
+
     n,d = X.shape
+    #build pairwise label matrices Ym and Ytil
+    #initialize Ym with ones
     Ym = -np.matrix(np.ones((n,n)))
+    #init Ytil with eps
     Ytil = eps*np.matrix(np.ones((n,n)))
     for y in np.unique(Y):
       y_vec = Y==y
-      Ym = Ym + 2*np.outer(y_vec,y_vec)
-      Ytil = Ytil + (1-eps)*np.outer(y_vec,y_vec)
+      Y_set=np.outer(y_vec,y_vec)
+      Ym[Y_set]=1
+      Ytil[Y_set]=1
+    #transpose X
     X = X.T 
-    U, E, V = randomized_svd(X,n_components=m,n_iter=5,random_state=None)
+    #SVD projection
+    U, E, V = randomized_svd(X,n_components=m,n_iter=5,random_state=17)
     U = np.asmatrix(U)
     E2 = np.matrix(np.diag(E**2))
     Xtil = U.T*X
-    W = np.matrix(np.identity(m))
+    XtilT=Xtil.T
     I = np.matrix(np.identity(m))
+    W = I.copy()
     L = np.matrix(np.zeros((n,n)))
-    S = Xtil.T*Xtil
+    S = XtilT*Xtil
     #find W using linearized ADMM (alternating direction method of multipliers)
     for k in xrange(T):
       Z = Tfunc_fast(Ytil-np.multiply(Ym,S)-L,1.0/rho)
-      G = alpha/rho*I+Xtil*np.multiply(Ym,Z-Ytil+L)*Xtil.T + E2*W*E2
+      G = alpha/rho*I+Xtil*np.multiply(Ym,Z-Ytil+L)*XtilT + E2*W*E2
       W = nearPSD(W-tau*G,epsilon)
-      S = Xtil.T*W*Xtil
+      S = XtilT*W*Xtil
       Delta = Z-Ytil+np.multiply(Ym,S)
       L = L + Delta
       if np.sum(np.multiply(Delta,Delta))/n**2 <= tol:
@@ -74,7 +83,7 @@ def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
     E,H = np.linalg.eig(W)
     E = np.maximum(E,epsilon)
     out = U*H*np.diag(np.sqrt(E))
-    return(out)
+    return(out)#return the optimal low rank basis Lstar
 
 #### LowRankBiLinear Example #####
 #m = 2
