@@ -39,10 +39,11 @@ def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
     # m - dimension of similarity function
     # X - n x d data matrix. n << d. n observations, d dimensions
     # Y - n x 1 label vector
-    # eps - ?
-    # rho - ?
+    # eps - margin parameter for the metric. eps >0, a small positive value
+    # rho - rho >0, penalty parameter for the augmentation term of the lagrangian (method of multipliers)
+    #       the dual variable update uses a step size equal to rho 
     # alpha - regularization strength
-    # tau - ?
+    # tau - step size for the W updates
     # T - iteration limit
     n,d = X.shape
     Ym = -np.matrix(np.ones((n,n)))
@@ -60,6 +61,7 @@ def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
     I = np.matrix(np.identity(m))
     L = np.matrix(np.zeros((n,n)))
     S = Xtil.T*Xtil
+    #find W using linearized ADMM (alternating direction method of multipliers)
     for k in xrange(T):
       Z = Tfunc_fast(Ytil-np.multiply(Ym,S)-L,1.0/rho)
       G = alpha/rho*I+Xtil*np.multiply(Ym,Z-Ytil+L)*Xtil.T + E2*W*E2
