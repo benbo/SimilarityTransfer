@@ -6,6 +6,7 @@ from sklearn.utils.extmath import randomized_svd
 #### LowRankBiLinear #####
 # Method due to Liu et al. (2015) Low-Rank Similarity Metric Learning in High Dimensions
 
+#proximal mapping
 def Tfunc(M,theta):
    n,m = M.shape
    out = np.zeros((n,m))
@@ -14,6 +15,13 @@ def Tfunc(M,theta):
         if M[i,j]>theta: out[i,j]=M[i,j]-theta
         elif M[i,j]<0.0: out[i,j]=M[i,j]
    return(out)
+
+#faster proximal mapping
+def Tfunc_fast(M,theta):
+    A=M.copy() 
+    A[M>0]=0
+    return np.maximum(M-theta,0)+A
+
 
 def nearPSD(A,epsilon=0):
    n = A.shape[0]
@@ -53,7 +61,7 @@ def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
     L = np.matrix(np.zeros((n,n)))
     S = Xtil.T*Xtil
     for k in xrange(T):
-      Z = Tfunc(Ytil-np.multiply(Ym,S)-L,1.0/rho)
+      Z = Tfunc_fast(Ytil-np.multiply(Ym,S)-L,1.0/rho)
       G = alpha/rho*I+Xtil*np.multiply(Ym,Z-Ytil+L)*Xtil.T + E2*W*E2
       W = nearPSD(W-tau*G,epsilon)
       S = Xtil.T*W*Xtil
@@ -68,12 +76,12 @@ def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
 
 #### LowRankBiLinear Example #####
 #m = 2
-#X = np.matrix([[1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1],
-              #[0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
-              #[1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0],
-              #[0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
-              #[0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1],
-              #[1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1]])
+X = np.matrix([[1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1],
+              [0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
+              [1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0],
+              [0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+              [0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1],
+              [1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1]])
 #Y = np.array([1, 1, 1, 0, 0, 0])
 #eps = 0.1
 #rho = 1
