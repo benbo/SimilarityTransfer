@@ -1,6 +1,76 @@
 # -*- coding: utf-8 -*-
 import numpy as np
+import random
 from sklearn.utils.extmath import randomized_svd
+from scipy.optimize import minimize
+
+nprs = np.random.RandomState(4217)
+random.seed(4217)
+
+
+#####################################################################
+#####################   RDML    
+# Jin, R., Wang, S., & Zhou, Y. (2009). Regularized distance metric learning: Theory and algorithm. In Advances in neural information processing systems (pp. 862-870).
+
+def RDML(X,Y,lmbda=0.1,T=1000):
+    # X     - nxd input matrix with 
+    #           n - number of patterns
+    #           d - number of features
+    # Y     - n-dimensional array of labels
+    # lmbda - learning rate 
+    # T     - max number of iterations 
+
+    if not isinstance(X, np.matrix):
+        X=np.matrix(X)
+
+    #get dimensions
+    n,d = X.shape
+    #initialize A
+    A=np.matrix(np.zeros((d,d)))
+    for i in xrange(T):
+        #chose a pair. Use random sample to chose a pair without replacement.
+        pair=np.array(random.sample(xrange(n),2))
+        #get labels
+        #import IPython
+        #IPython.embed()
+        ys=Y[pair]
+
+        yt=-1.0
+        if ys[0]==ys[1]: yt=1.0
+        #get random rows
+        xs=X[pair,:]
+        #classify
+        xd=xs[0,:]-xs[1,:]
+        if yt*(xd*A*xd.T)>0.0:
+            #correctly classified, don't adapt A
+            continue
+        #use near psd projection
+        #A=nearPSD(A-lmbda*yt*xd.T*xd,epsilon=10**-10)
+        #use approximate solution derived in RDML paper
+        if yt==-1:
+            A=A-lmbda*yt*xd.T*xd
+        else:
+            lmbda_t=lambda_CG(A,xd,lmbda)
+            A=A-lmbda_t*yt*xd.T*xd
+    return A
+
+
+def lambda_CG(A,xd,lmbda):
+    # using conjugate gradient method
+    # Shewchuk, J. R. (1994). An introduction to the conjugate gradient method without the agonizing pain.
+    result = minimize(f_loss,x0=np.zeros(xd.shape[1]),hess=f_hess,options={'disp':True},method='Newton-CG',jac=f_grad,args=(A,xd.T))
+    return min(lmbda,result.fun**-1)
+
+def f_loss(u,A,xdT):
+    u=np.matrix(u)
+    return np.squeeze(np.asarray(-2.0*u*xdT+u*A*u.T))
+    
+def f_grad(u,A,xdT):
+    u=np.matrix(u)
+    return np.squeeze(np.asarray(-2.0*xdT+(A+A.T)*u.T))
+
+def f_hess(u,A,xdT):
+    return np.asarray(A+A.T)
 
 #####################################################################
 #### LowRankBiLinear #####
@@ -87,18 +157,48 @@ def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
 
 #### LowRankBiLinear Example #####
 #m = 2
-X = np.matrix([[1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1],
-              [0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
-              [1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0],
-              [0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
-              [0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1],
-              [1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1]])
+#X = np.matrix([[1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1],
+#              [0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
+#              [1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0],
+#              [0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+#              [0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1],
+#              [1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1]])
 #Y = np.array([1, 1, 1, 0, 0, 0])
-#eps = 0.1
-#rho = 1
+#eps = 0.01
+#rho = 1.0
 #alpha = 0.5
 #tau = 0.01
-#T = 10
+#T = 100
 #tol = 1e-6
 #L = LowRankBiLinear(m,X,Y,eps,rho,tau,T)
+#print L 
+def test():
+    from sklearn.datasets import load_digits
+    from sklearn.neighbors import KNeighborsClassifier
+    from sklearn.cross_validation import StratifiedKFold
+    digits = load_digits()
+    X=digits.data
+    Y=digits.target
+    # 10-fold cross validation
+    skf = StratifiedKFold(Y, 10,random_state=17)
+    for j,x in enumerate(skf):
+        #learn metric
+        A=RDML(X[x[0]],Y[x[0]],T=1*len(x[0]))
+        clf = KNeighborsClassifier(n_neighbors=1,metric='pyfunc',method='brute',metric_params={"A": A},func=mahalanobis)
+        clf.fit(X[x[0]],Y[x[0]])
+        print 'accuracy: '+str(clf.score(X[x[1]],Y[x[1]]))
 
+
+def mahalanobis(x,y,**kwargs):
+    xd=np.matrix(x-y)
+    try:
+        return xd*kwargs["A"]*xd.T
+    except:
+        #we have to cheat since scikit seems to check the function but doesn't use the correct dimensions
+        return np.linalg.norm(x-y)
+
+def simfunc(x,y,**kwargs):
+    return np.matrix(x)*kwargs["A"]*np.matrix(y.T)
+
+if __name__ == "__main__":  
+    test()
