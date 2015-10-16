@@ -58,8 +58,11 @@ def RDML(X,Y,lmbda=0.1,T=1000):
 def lambda_CG(A,xd,lmbda):
     # using conjugate gradient method
     # Shewchuk, J. R. (1994). An introduction to the conjugate gradient method without the agonizing pain.
-    result = minimize(f_loss,x0=np.zeros(xd.shape[1]),hess=f_hess,options={'disp':True},method='Newton-CG',jac=f_grad,args=(A,xd.T))
-    return min(lmbda,result.fun**-1)
+    result = minimize(f_loss,x0=np.zeros(xd.shape[1]),hess=f_hess,options={'disp':False},method='Newton-CG',jac=f_grad,args=(A,xd.T))
+    if result.fun==0.0:
+        return 0.0
+    else:
+        return min(lmbda,(-result.fun)**-1)
 
 def f_loss(u,A,xdT):
     u=np.matrix(u)
