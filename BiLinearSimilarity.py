@@ -62,7 +62,7 @@ def lambda_CG(A,xd,lmbda):
     if result.fun==0.0:
         return 0.0
     else:
-        return min(lmbda,(-result.fun)**-1)
+        return max(0,min(lmbda,(-result.fun)**-1))
 
 def f_loss(u,A,xdT):
     u=np.matrix(u)
@@ -108,7 +108,7 @@ def nearPSD(A,epsilon=0.0):
    out = B*B.T
    return(out)
 
-def LowRankBiLinear(m,X,Y,eps,rho,tau,T,tol=1e-6,epsilon=0.0):
+def LowRankBiLinear(m,X,Y,alpha,eps,rho,tau,T,tol=1e-6,epsilon=10**-8):
     # m - dimension of similarity function
     # X - n x d data matrix. n << d. n observations, d dimensions
     # Y - n x 1 label vector
@@ -185,11 +185,27 @@ def test():
     # 10-fold cross validation
     skf = StratifiedKFold(Y, 10,random_state=17)
     for j,x in enumerate(skf):
-        #learn metric
-        A=RDML(X[x[0]],Y[x[0]],T=1*len(x[0]))
+        #RDML
+        A=RDML(X[x[0]],Y[x[0]],lmbda=0.2,T=50*len(x[0]))
         clf = KNeighborsClassifier(n_neighbors=1,metric='pyfunc',method='brute',metric_params={"A": A},func=mahalanobis)
+
+        #train
         clf.fit(X[x[0]],Y[x[0]])
+        #predict
         print 'accuracy: '+str(clf.score(X[x[1]],Y[x[1]]))
+
+    skf = StratifiedKFold(Y, 10,random_state=17)
+    for j,x in enumerate(skf):
+        #Liu et al
+        L=LowRankBiLinear(40,X[x[0]],Y[x[0]],0.1,10**-6,0.1,0.1,100,tol=1e-6,epsilon=10**-8)
+        A=L*L.T
+        clf = KNeighborsClassifier(n_neighbors=1,metric='pyfunc',method='brute',metric_params={"A": A},func=distkernel)
+
+        #train
+        clf.fit(X[x[0]],Y[x[0]])
+        #predict
+        print 'accuracy: '+str(clf.score(X[x[1]],Y[x[1]]))
+    
 
 
 def mahalanobis(x,y,**kwargs):
@@ -199,6 +215,14 @@ def mahalanobis(x,y,**kwargs):
     except:
         #we have to cheat since scikit seems to check the function but doesn't use the correct dimensions
         return np.linalg.norm(x-y)
+
+def distkernel(x,y,**kwargs):
+    try:
+        return 1.0 - np.matrix(x)*kwargs["A"]*np.matrix(y.T)
+    except:
+        #we have to cheat since scikit seems to check the function but doesn't use the correct dimensions
+        return np.linalg.norm(x-y)
+
 
 def simfunc(x,y,**kwargs):
     return np.matrix(x)*kwargs["A"]*np.matrix(y.T)
