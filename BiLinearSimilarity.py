@@ -158,55 +158,6 @@ def LowRankBiLinear(m,X,Y,alpha,eps,rho,tau,T,tol=1e-6,epsilon=10**-8):
     out = U*H*np.diag(np.sqrt(E))
     return(out)#return the optimal low rank basis Lstar
 
-#### LowRankBiLinear Example #####
-#m = 2
-#X = np.matrix([[1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1],
-#              [0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
-#              [1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0],
-#              [0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
-#              [0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1],
-#              [1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1]])
-#Y = np.array([1, 1, 1, 0, 0, 0])
-#eps = 0.01
-#rho = 1.0
-#alpha = 0.5
-#tau = 0.01
-#T = 100
-#tol = 1e-6
-#L = LowRankBiLinear(m,X,Y,eps,rho,tau,T)
-#print L 
-def test():
-    from sklearn.datasets import load_digits
-    from sklearn.neighbors import KNeighborsClassifier
-    from sklearn.cross_validation import StratifiedKFold
-    digits = load_digits()
-    X=digits.data
-    Y=digits.target
-    # 10-fold cross validation
-    skf = StratifiedKFold(Y, 10,random_state=17)
-    for j,x in enumerate(skf):
-        #RDML
-        A=RDML(X[x[0]],Y[x[0]],lmbda=0.2,T=50*len(x[0]))
-        clf = KNeighborsClassifier(n_neighbors=1,metric='pyfunc',method='brute',metric_params={"A": A},func=mahalanobis)
-
-        #train
-        clf.fit(X[x[0]],Y[x[0]])
-        #predict
-        print 'accuracy: '+str(clf.score(X[x[1]],Y[x[1]]))
-
-    skf = StratifiedKFold(Y, 10,random_state=17)
-    for j,x in enumerate(skf):
-        #Liu et al
-        L=LowRankBiLinear(40,X[x[0]],Y[x[0]],0.1,10**-6,0.1,0.1,100,tol=1e-6,epsilon=10**-8)
-        A=L*L.T
-        clf = KNeighborsClassifier(n_neighbors=1,metric='pyfunc',method='brute',metric_params={"A": A},func=distkernel)
-
-        #train
-        clf.fit(X[x[0]],Y[x[0]])
-        #predict
-        print 'accuracy: '+str(clf.score(X[x[1]],Y[x[1]]))
-    
-
 
 def mahalanobis(x,y,**kwargs):
     xd=np.matrix(x-y)
@@ -223,9 +174,51 @@ def distkernel(x,y,**kwargs):
         #we have to cheat since scikit seems to check the function but doesn't use the correct dimensions
         return np.linalg.norm(x-y)
 
+def test():
+    from sklearn.datasets import load_digits
+    from sklearn.neighbors import KNeighborsClassifier
+    from sklearn.cross_validation import StratifiedKFold
+    digits = load_digits()
+    X=digits.data
+    Y=digits.target
+    # 10-fold cross validation
+    skf = StratifiedKFold(Y, 10,random_state=17)
+    res=[]
+    print 'RDML'
+    for j,x in enumerate(skf):
+        #RDML
+        A=RDML(X[x[0]],Y[x[0]],lmbda=0.2,T=50*len(x[0]))
+        clf = KNeighborsClassifier(n_neighbors=1,metric='pyfunc',method='brute',metric_params={"A": A},func=mahalanobis)
 
-def simfunc(x,y,**kwargs):
-    return np.matrix(x)*kwargs["A"]*np.matrix(y.T)
+        #train
+        clf.fit(X[x[0]],Y[x[0]])
+        #predict
+        acc=clf.score(X[x[1]],Y[x[1]])
+        res.append(acc)
+        print 'accuracy: '+str(acc)
+    res=np.array(res)
+    print 'average: '+str(res.mean())
+    print 'std dev: '+str(res.std())
+
+    skf = StratifiedKFold(Y, 10,random_state=17)
+    res=[]
+    print 'Liu et al.'
+    for j,x in enumerate(skf):
+        #Liu et al
+        L=LowRankBiLinear(40,X[x[0]],Y[x[0]],0.1,10**-6,0.1,0.1,100,tol=1e-6,epsilon=10**-8)
+        A=L*L.T
+        clf = KNeighborsClassifier(n_neighbors=1,metric='pyfunc',method='brute',metric_params={"A": A},func=distkernel)
+
+        #train
+        clf.fit(X[x[0]],Y[x[0]])
+        #predict
+        acc=clf.score(X[x[1]],Y[x[1]])
+        res.append(acc)
+        print 'accuracy: '+str(acc)
+    res=np.array(res)
+    print 'average: '+str(res.mean())
+    print 'std dev: '+str(res.std())
+    
 
 if __name__ == "__main__":  
     test()
