@@ -9,6 +9,7 @@ from scipy.optimize import minimize
 from sklearn.utils.extmath import weighted_mode
 from scipy.stats import mode
 from itertools import izip
+import scipy
 
 
 nprs = np.random.RandomState(4217)
@@ -156,9 +157,15 @@ def LowRankBiLinear(m,X,Y,alpha,eps,rho,tau,T,tol=1e-6,epsilon=10**-8):
     X = X.T 
     #SVD projection
     #U, E, _ = randomized_svd(X,n_components=m,n_iter=5,random_state=17)
-    U, E, _ = np.linalg.svd(X, full_matrices=False)
-    U=U[:,:m]
-    E=E[:m]
+
+    #http://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.linalg.svds.html
+    if scipy.sparse.issparse(X):
+        U, E, _ = scipy.sparse.linalg.svds(X,k=m)
+    else:
+        U, E, _ = np.linalg.svd(X, full_matrices=False)
+        U=U[:,:m]
+        E=E[:m]
+
     U = np.asmatrix(U)
     E2 = np.matrix(np.diag(E**2))
     Xtil = U.T*X
